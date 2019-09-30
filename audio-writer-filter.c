@@ -157,6 +157,8 @@ static void *writer_create(obs_data_t *settings, obs_source_t *filter)
 
 static void writer_destroy(writer_data_t *data)
 {
+	obs_frontend_remove_event_callback(frontend_event_callback, data);
+
 	close_output(data);
 
 	if (data->output_filename != NULL) bfree(data->output_filename);
