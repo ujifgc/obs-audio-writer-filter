@@ -1,5 +1,9 @@
 # An audio writer filter for OBS
 
+## Use cases
+
+- You stream something with Noise gate and Compressor filters but you want to keep the original audio for postproduction with better quality tools
+
 ## Usage
 
 1. Download a zip from https://github.com/ujifgc/obs-audio-writer-filter/releases
