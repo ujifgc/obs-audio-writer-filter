@@ -13,7 +13,7 @@ typedef const struct {
 typedef struct {
 	obs_source_t *filter;
 	obs_source_t *parent;
-	bool do_writing;
+	int writing_triggers_count;
 	struct resample_info sample_info;
 	uint32_t bytes_per_input_packet;
 	uint32_t bit_rate;

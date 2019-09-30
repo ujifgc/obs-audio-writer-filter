@@ -136,13 +136,11 @@ static void frontend_event_callback(enum obs_frontend_event event, writer_data_t
 	switch (event) {
 	case OBS_FRONTEND_EVENT_STREAMING_STARTED:
 	case OBS_FRONTEND_EVENT_RECORDING_STARTED:
-		open_output(data);
-		data->do_writing = true;
+		if (++data->writing_triggers_count > 0) open_output(data);
 		break;
 	case OBS_FRONTEND_EVENT_RECORDING_STOPPING:
 	case OBS_FRONTEND_EVENT_STREAMING_STOPPING:
-		data->do_writing = false;
-		close_output(data);
+		if (--data->writing_triggers_count <= 0) close_output(data);
 		break;
 	}
 }
@@ -180,7 +178,7 @@ static struct obs_audio_data *writer_filter_audio(writer_data_t *data, struct ob
 		data->sample_info = data->parent->sample_info;
 	}
 
-	if (data->do_writing) {
+	if (data->writing_triggers_count > 0) {
 		data->encoder->write_packet(data, audio);
 	}
 
