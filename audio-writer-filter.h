@@ -27,6 +27,7 @@ typedef struct {
 
 	const char *output_folder;
 	const char *output_ext;
+	const char *output_filename_format;
 	char *output_filename;
 	encoder_t *encoder;
 

@@ -7,6 +7,9 @@
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("audio-writer-filter", "en-US")
 
+#define S_FILENAME_FORMAT "filename_format"
+#define TEXT_FILENAME_FORMAT obs_module_text("AudioWriterFilter.FilenameFormat")
+#define DEFAULT_FILENAME_FORMAT "audio-writer-filter [%SRC] %CCYY-%MM-%DD %hh-%mm-%ss"
 #define S_FOLDER_PATH "folder_path"
 #define TEXT_FOLDER_PATH obs_module_text("AudioWriterFilter.FolderPath")
 #define S_OUTPUT_ENCODER "output_encoder"
@@ -33,45 +36,23 @@ static encoder_t *get_encoder_by_name(const char *encoder_name) {
 	return &encoders[0];
 }
 
-#define OUTPUT_NAME_PREFIX "obs-audio-writer"
-#define OUTPUT_DATE_FORMAT "%Y-%m-%d %H-%M-%S" // format 'yyyy-mm-dd hh-mm-ss'
-#define PREFIX_SIZE sizeof(OUTPUT_NAME_PREFIX)
-#define DATE_SIZE (sizeof(OUTPUT_DATE_FORMAT) + 2) // 2 for year hundreds
-#define SUFFIX_SIZE (1 + PREFIX_SIZE + DATE_SIZE + 1) // 1 for dot, 1 for slash
-
 static const char *new_output_filename(writer_data_t *data)
 {
-	if (data->output_folder == NULL || strlen(data->output_folder) == 0) return NULL;
+	if (data->output_filename != NULL) bfree(data->output_filename);
 
-	const char *parent_source_name = data->parent ? data->parent->context.name : "unknown";
-	size_t new_filename_length =
-		strlen(data->output_folder) +
-		strlen(parent_source_name) +
-		strlen(data->encoder->ext) +
-		SUFFIX_SIZE + 1;
-	data->output_filename = data->output_filename ?
-		brealloc(data->output_filename, new_filename_length) :
-		bzalloc(new_filename_length);
+	struct dstr temp = { 0 };
+	dstr_init_copy(&temp, data->output_folder);
+	dstr_cat_ch(&temp, '/');
+	dstr_cat(&temp, data->output_filename_format);
+	dstr_replace(&temp, "%SRC", data->parent ? data->parent->context.name : "unknown");
+	data->output_filename = os_generate_formatted_filename(data->encoder->ext, true, temp.array);
+	dstr_free(&temp);
 
-	time_t now = time(0);
-	char formatted_time[DATE_SIZE];
-	do {
-		strftime(formatted_time, sizeof(formatted_time), OUTPUT_DATE_FORMAT, localtime(&now));
-		now++;
-
-		sprintf(data->output_filename, "%s/%s [%s] %s.%s",
-			data->output_folder,
-			OUTPUT_NAME_PREFIX,
-			parent_source_name,
-			formatted_time,
-			data->encoder->ext);
-
-		char *p = data->output_filename + strlen(data->output_folder) + 1;
-		while (*p) {
-			if (strchr("\\/:*?!&\"'<>|", *p)) *p = '_';
-			p++;
-		}
-	} while (os_file_exists(data->output_filename));
+	char *p = data->output_filename + strlen(data->output_folder) + 1;
+	while (*p) {
+		if (strchr("\\/:*?!&\"'<>|", *p)) *p = '_';
+		p++;
+	}
 
 	return data->output_filename;
 }
@@ -115,6 +96,7 @@ static void writer_update(writer_data_t *data, obs_data_t *settings)
 		if (folder_changed)
 			close_output(data);
 	}
+	data->output_filename_format = obs_data_get_string(settings, S_FILENAME_FORMAT);
 
 	const char *encoder_name = obs_data_get_string(settings, S_OUTPUT_ENCODER);
 	encoder_t *new_encoder = get_encoder_by_name(encoder_name);
@@ -187,19 +169,27 @@ static struct obs_audio_data *writer_filter_audio(writer_data_t *data, struct ob
 	return audio;
 }
 
+static const char *get_homedir()
+{
+	const char *home = getenv("HOME");
+	if (home == NULL) home = getenv("USERPROFILE");
+	if (home == NULL) home = "";
+	return home;
+}
+
 static void writer_get_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_string(settings, S_FOLDER_PATH, "");
+	obs_data_set_default_string(settings, S_FOLDER_PATH, get_homedir());
 	obs_data_set_default_string(settings, S_OUTPUT_ENCODER, encoders[0].name);
+	obs_data_set_default_string(settings, S_FILENAME_FORMAT, DEFAULT_FILENAME_FORMAT);
 }
 
 static obs_properties_t *writer_get_properties(writer_data_t *data)
 {
-	UNUSED_PARAMETER(data);
-
 	obs_properties_t *properties = obs_properties_create();
 
-	obs_properties_add_path(properties, S_FOLDER_PATH, TEXT_FOLDER_PATH, OBS_PATH_DIRECTORY, NULL, NULL);
+	obs_properties_add_path(properties, S_FOLDER_PATH, TEXT_FOLDER_PATH, OBS_PATH_DIRECTORY, NULL, data->output_folder);
+	obs_properties_add_text(properties, S_FILENAME_FORMAT, TEXT_FILENAME_FORMAT, OBS_TEXT_DEFAULT);
 
 	obs_property_t *property = obs_properties_add_list(properties, S_OUTPUT_ENCODER, TEXT_OUTPUT_ENCODER, OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
 	for (int i = 0; i < sizeof(encoders) / sizeof(encoder_t); i++) {
