@@ -22,3 +22,10 @@ The filter uses CoreAudio encoder to write AAC format. To install it you may hav
 
 https://obsproject.com/forum/resources/obs-studio-enable-coreaudio-aac-encoder-windows.220/
 
+## Troubleshooting
+
+#### The file is too small or corrupted
+
+Please ensure that you use appropriate build for your OBS version.  
+Major OBS releases change ABI so this plugin could fail to capture audio stream.  
+If there's no build for your OBS version please report it here: https://github.com/ujifgc/obs-audio-writer-filter/issues
